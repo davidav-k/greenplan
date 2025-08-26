@@ -1,0 +1,49 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: greenplan
+      POSTGRES_USER: gp_user
+      POSTGRES_PASSWORD: gp_pass
+    ports: ["5432:5432"]
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address :9001
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports: ["9000:9000","9001:9001"]
+    volumes: ["minio:/data"]
+
+  ollama:
+    image: ollama/ollama:latest
+    ports: ["11434:11434"]
+    volumes: ["ollama:/root/.ollama"]
+
+  api:
+    build:
+      context: ../backend
+      dockerfile: modules/app/Dockerfile
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      DB_URL: jdbc:postgresql://db:5432/greenplan
+      DB_USER: gp_user
+      DB_PASS: gp_pass
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_BUCKET: greenplan
+      OLLAMA_BASE_URL: http://ollama:11434
+      OLLAMA_EMBED_MODEL: mxbai-embed-large
+      CLOUD_LLM_MODEL: gpt-4o-mini
+      CLOUD_LLM_BASE_URL: https://api.openai.com/v1
+      OPENAI_API_KEY: changeme
+    depends_on: [db, minio, ollama]
+    ports: ["8181:8181"]
+
+volumes:
+  pgdata: {}
+  minio: {}
+  ollama: {}
