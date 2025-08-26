@@ -1,0 +1,17 @@
+# Normalize line endings
+* text=auto eol=lf
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+
+# Treat lock files as text for diff
+package-lock.json -merge
+pnpm-lock.yaml -merge
+
+# Linguist overrides (optional)
+*.svg linguist-generated=true
+
+# Exclude dev files from archive exports
+.github export-ignore
+.vscode export-ignore
+.devcontainer export-ignore
+scripts export-ignore

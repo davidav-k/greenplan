@@ -1,0 +1,45 @@
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Java / Maven
+**/target/
+**/.mvn/
+.mvn/wrapper/
+
+# Node
+**/node_modules/
+**/dist/
+**/.next/
+**/.nuxt/
+
+# Python
+**/.venv/
+**/__pycache__/
+**/*.pyc
+
+# Coverage / reports
+coverage/
+**/site/
+**/reports/
+
+# Docker
+**/.docker-cache/
+**/tmp/
+
+# Env files
+.env
+.env.*
+!.env.example
+
+# Logs
+logs/
+**/*.log
+
+# Build artifacts
+**/build/
+
+# Misc
+infrastructure/
