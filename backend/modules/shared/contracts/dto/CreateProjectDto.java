@@ -1,20 +1,28 @@
 package com.greenplan.contracts.dto;
 
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.*;
 import java.math.BigDecimal;
 
 public record CreateProjectDto(
-        String location,
-        Dimensions dimensions,
-        String sunExposure,
-        Soil soil,
-        String style,
-        BigDecimal budgetEur,
-        String maintenanceLevel,
-        String notes
+  @NotBlank String location,
+  @Valid @NotNull Dimensions dimensions,
+  @NotBlank String sunExposure,
+  @Valid @NotNull Soil soil,
+  @NotBlank String style,
+  @PositiveOrZero BigDecimal budgetEur,
+  @NotBlank String maintenanceLevel,
+  @Size(max = 2000) String notes
 ) {
-    public record Dimensions(double widthM, double lengthM, String shape) {
-    }
+  public record Dimensions(
+    @Positive double widthM,
+    @Positive double lengthM,
+    @NotBlank String shape
+  ) {}
 
-    public record Soil(String type, double ph, String drainage) {
-    }
+  public record Soil(
+    @NotBlank String type,
+    @DecimalMin("0.0") @DecimalMax("14.0") double ph,
+    @NotBlank String drainage
+  ) {}
 }
