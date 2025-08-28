@@ -1,0 +1,148 @@
+# Промпт для Cursor
+
+**Роль:** Ты — старший Java/Spring Boot разработчик в проекте *greenplan*. Твоя задача — дописать бэкенд под workflow из `workflow_v2.jpg` для приложения ландшафтного проектирования с AI: сбор входных данных → генерация 3 визуальных концепций (облачная LLM) → пользователь выбирает/уточняет → оформление документов (локальная LLM) → выдача готового комплекта (PDF, XLSX) с ссылками на загрузку из MinIO.
+
+## Базовые условия и кодовая база
+
+* Используй multi-module Maven проект уже созданный в `backend/` (Java 21, Spring Boot 3.3.x). Не ломай структуру модулей.&#x20;
+* Docker-сервисы уже описаны: Postgres+pgvector (`db`), MinIO (`minio`), Ollama (`ollama`), и API (`api`). Используй существующие переменные окружения.&#x20;
+* В проекте уже есть:
+
+  * DTO для создания проекта: `CreateProjectDto`, ответ `ProjectCreatedResponse`.&#x20;
+  * Стартовый `ProjectController` c POST `/api/projects`. Расширить.&#x20;
+  * Каркасы для LLM: `generation.OpenAiClient` (Cloud), `generation.OllamaClient` (Local text), интерфейс `CloudLlm`.&#x20;
+  * Хранилище assets на MinIO: `assets.StorageService`.&#x20;
+  * Простейший рендер: `render.SimpleRender` (PDF placeholder, XLSX из списка растений). Можно расширить.&#x20;
+  * Модуль `authoring.LocalLlm` — заглушка локальной LLM для оформления документов. Подключи.&#x20;
+  * RAG задел: `knowledge.RagSearchService`/`PgVector` и Flyway миграции модулей. Подключай по мере надобности.&#x20;
+
+## Архитектурные принципы
+
+* **Слои:** `app` — веб/API, бизнес-сервисы живут в соответствующих модулях (project/generation/authoring/render/assets/knowledge/chat).&#x20;
+* **Долгие операции:** запускать асинхронно: сразу отдавать `202 Accepted` + ресурс статуса (`GET .../status`), а результат складывать в БД и файлы в MinIO с presigned-URL через `StorageService`.&#x20;
+* **Состояния проекта:** `NEW → CONCEPTS_PENDING → CONCEPTS_READY → AUTHORING_PENDING → DOCS_READY → DONE`.
+* **Хранение:**
+
+  * Postgres: проекты/концепции/ревизии/документы (Flyway в `app` + при необходимости в профили других модулей).&#x20;
+  * MinIO: изображения концепций, PDF, XLSX, техдок (presigned GET).&#x20;
+
+## Эндпоинты (MVP)
+
+1. `POST /api/projects` — создать проект (валидация по `CreateProjectDto`). Ответ: `ProjectCreatedResponse`. **Persist** в таблицу `projects`. Статус `NEW`.&#x20;
+2. `POST /api/projects/{id}/concepts` — запустить генерацию 3 концепций (облачная LLM через `OpenAiClient`). Ответ: `202 Accepted` + `Location: /api/projects/{id}/concepts/status`.
+3. `GET /api/projects/{id}/concepts/status` — прогресс и список карточек концепций (после готовности): `{id, title, summary, plants[], image_url, prompt}`. `image_url` — presigned из MinIO.&#x20;
+4. `POST /api/projects/{id}/concepts/{conceptId}/revise` — уточнение выбранной концепции по инструкциям пользователя (облачная LLM), создаёт **version 2**.
+5. `POST /api/projects/{id}/finalize` — отправить выбранную (и, возможно, уточнённую) концепцию в этап оформления (локальная LLM `authoring.LocalLlm` + `render.SimpleRender` → PDF/XLSX). Ответ `202 Accepted` + `Location: /api/projects/{id}/documents/status`.&#x20;
+6. `GET /api/projects/{id}/documents/status` — список документов с presigned-ссылками (PDF план, XLSX ведомость растений, сводная смета/Markdown→PDF placeholder).&#x20;
+
+## Данные и миграции (Flyway, модуль `app`)
+
+Создай миграции:
+
+* `projects(id uuid pk, input jsonb, status text, created_at timestamptz, updated_at timestamptz)` — синхронизируй с `Project` entity.&#x20;
+* `concept(id uuid pk, project_id uuid fk, title text, summary text, plants jsonb, image_key text, prompt text, version int, created_at timestamptz)`
+* `document(id uuid pk, project_id uuid fk, type text, key text, created_at timestamptz)`
+  Учти уже существующие миграции (`V1__init_schema.sql` в `app`, `V2__knowledge_schema.sql` в `knowledge`) — не ломай нумерацию.&#x20;
+
+## Логика генерации
+
+* **Концепции (облачная LLM):** Используй `OpenAiClient.generateStrictJson(system, user, schema)` для выдачи **строгого JSON** по схеме:
+
+  ```json
+  { "concepts": [
+      { "title": "...", "summary": "...", "plants": [{"latin":"..." , "qty": 0}], "image_prompt": "..." }
+    ]}
+  ```
+
+  Сгенерируй 3 элемента.&#x20;
+* **Изображения концепций (MVP):** Создай простой `ImageRender` в модуле `render` (Java2D) для PNG-плейсхолдеров с текстом `title` (1920×1080). Запиши в MinIO через `StorageService.put(...)` и верни presigned-url через `presignedGet`.&#x20;
+* **Оформление документов (локальная LLM):**
+
+  * `authoring.LocalLlm.generateContent(prompt)` — пока как заглушка: на выход — Markdown c разделами: «Описание», «Пояснительная записка», «Смета (таблица)», «Ведомость растений». Далее `SimpleRender.pdfFromMarkdown(...)` и `xlsxFromPlantList(...)`, положить в MinIO + отдать presigned.&#x20;
+
+## Технические требования
+
+* Все новые сервисы/репозитории и API — в модуле `app`, а доменные классы — по модулю-назначению (`project`/`render`/`generation`/`authoring`). В `app` — только «склейка» через бин-конфигурации (см. `Beans`).&#x20;
+* Настройки брать из `application.yml`/env: `DB_*`, `MINIO_*`, `OLLAMA_*`, `CLOUD_LLM_*`, `OPENAI_API_KEY`. Не менять имена ключей.&#x20;
+* Возвращай корректные HTTP-коды: 201/202/200/404/422, ошибки — Problem+JSON.
+* Покрой минимумом unit-тестов JSON-схемы и сервисов преобразования.
+
+## Acceptance-критерии (MVP)
+
+* `docker compose -f compose.yml up -d db minio ollama api` поднимает сервисы, API проходит healthcheck и принимает запросы на 8181.&#x20;
+* `POST /api/projects` с валидным `CreateProjectDto` создаёт проект и возвращает `id`.&#x20;
+* После `POST /api/projects/{id}/concepts` — через `GET /api/projects/{id}/concepts/status` выдаются 3 карточки с presigned-URL картинок из MinIO.
+* `POST /api/projects/{id}/finalize` генерирует PDF и XLSX, ссылки доступны в `GET /api/projects/{id}/documents/status`.
+
+---
+
+# Как использовать этот промпт в Cursor — итерациями
+
+**Итерация 0. Подготовка**
+
+1. Открой репозиторий `greenplan` в Cursor. Убедись, что видны модули и compose.&#x20;
+2. В терминале:
+
+   ```bash
+   docker compose -f compose.yml up -d db minio ollama
+   docker compose -f compose.yml up -d api
+   curl http://localhost:8181/actuator/health
+   ```
+
+   Проверка env из `.env.example` при необходимости.&#x20;
+
+**Итерация 1. Проекты + БД**
+
+* Задача в Cursor: дополни `Project` (если нужно), создай `ProjectRepository` и `ProjectService`, расширь `ProjectController#create` так, чтобы **persist** проект и вернуть `ProjectCreatedResponse`. Добавь Flyway `V3__projects.sql`. Синхронизируй с `application.yml` (Flyway пути).&#x20;
+* Быстрый тест:
+
+  ```bash
+  curl -s http://localhost:8181/api/projects -X POST -H "Content-Type: application/json" \
+  -d '{"location":"Helsinki, FI","dimensions":{"widthM":10,"lengthM":20,"shape":"rectangle"},"sunExposure":"full","soil":{"type":"loam","ph":6.8,"drainage":"good"},"style":"japanese","budgetEur":5000,"maintenanceLevel":"low","notes":"bench"}} 
+  ```
+
+**Итерация 2. Генерация 3 концепций (облачная LLM)**
+
+* Добавь сущности/таблицы `concept` (V4), сервис `ConceptService` в `app`, который:
+
+  1. берёт `Project` + входные данные,
+  2. зовёт `OpenAiClient.generateStrictJson(...)` по JSON-схеме 3 карточек,
+  3. создаёт PNG-плейсхолдеры через новый `render.ImageRender` и кладёт их в MinIO (`StorageService.put`),
+  4. сохраняет метаданные в БД.&#x20;
+* Контроллеры: `POST /api/projects/{id}/concepts` (accept), `GET .../status`.
+
+**Итерация 3. Ревизии/уточнения**
+
+* Таблица версияции: `concept.version` (+ история при желании). Эндпоинт `POST /api/projects/{id}/concepts/{cid}/revise` — с инструкциями пользователя.
+
+**Итерация 4. Оформление документов (локальная LLM)**
+
+* Сервис `AuthoringService`:
+
+  * формирует Markdown через `authoring.LocalLlm` (пока заглушка),
+  * генерирует PDF (`SimpleRender.pdfFromMarkdown`) и XLSX (`xlsxFromPlantList`),
+  * кладёт в MinIO, пишет записи в `document` (V5).
+  * Контроллеры: `POST /api/projects/{id}/finalize`, `GET .../documents/status`.&#x20;
+
+**Итерация 5. Прогресс/Статусы и ошибки**
+
+* Храни статус в `projects.status`, меняй по этапам. Возвращай 202/200 и Problem Details при ошибках.
+
+**Итерация 6. Мини-RAG (опционально)**
+
+* Подключи `knowledge.RagSearchService` для выдачи справки по растениям/каталогам при генерации концепций (расширь промпт ЛЛМ контекстом top-k результатов).&#x20;
+
+**Итерация 7. Мини-чат (опционально)**
+
+* Используй заготовки `chat.Chat`/`ChatEntry` для истории запросов проекта; добавь репозитории и простые endpoints.&#x20;
+
+---
+
+## Подсказки по работе в Cursor
+
+* Вставь «Промпт для Cursor» в новый Composer запрос и запускай по одной итерации: *одна итерация — один запрос*.
+* Всегда проси Cursor **указать список изменённых файлов** и **сформировать Flyway-миграции** с аккуратной нумерацией.
+* После каждой итерации — `mvn -q -DskipTests clean package` внутри контейнера сборки (или локально), затем `docker compose up -d api` и curl-проверки.&#x20;
+* Проси Cursor добавлять короткие commit-messages в стиле Conventional Commits: `feat(app): concepts generation pipeline`, `chore(db): add V3 projects table`, и т.п.
+
+Хочешь — начнём сразу с **Итерации 1**: я могу сгенерировать точную JSON-схему для облачной LLM и шаблоны сервисов/репозиториев под неё.
