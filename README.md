@@ -1,8 +1,10 @@
 # greenplan
-
+```markdown
+made with ChatGPT
+```
 Green planning application with modular architecture.
-
-## Project Structure
+___
+### Project Structure
 
 ### Modules
 - **app**: Web/API layer (entrypoint) - REST controllers and application configuration
@@ -31,3 +33,4 @@ Green planning application with modular architecture.
 1. Start infrastructure services:
 ```bash
 docker compose -f docker/compose.yml up -d db minio ollama
+
