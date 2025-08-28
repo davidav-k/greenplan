@@ -1,5 +1,7 @@
 # greenplan
-
+```markdown
+made with Grok
+```
 Green planning application with modular architecture.
 
 ## Project Structure
