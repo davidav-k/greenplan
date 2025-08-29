@@ -18,6 +18,9 @@ services:
       interval: 5s
       timeout: 3s
       retries: 30
+    networks:
+      - gp_net
+
 
   minio:
     image: minio/minio:RELEASE.2025-07-23T15-54-02Z-cpuv1
@@ -36,6 +39,8 @@ services:
       interval: 5s
       timeout: 3s
       retries: 30
+    networks:
+      - gp_net
 
   ollama:
     image: ollama/ollama:latest
@@ -52,37 +57,50 @@ services:
       interval: 5s
       timeout: 3s
       retries: 30
+    networks:
+      - gp_net
 
-  api:
-    build:
-      context: ./backend
-      dockerfile: modules/app/Dockerfile
-    container_name: gp-api
-    environment:
-      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
-      DB_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-greenplan}
-      DB_USER: ${POSTGRES_USER:-gp_user}
-      DB_PASS: ${POSTGRES_PASSWORD:-gp_pass}
-      MINIO_ENDPOINT: http://minio:9000
-      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
-      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
-      MINIO_BUCKET: ${MINIO_BUCKET:-greenplan}
-      OLLAMA_BASE_URL: http://ollama:11434
-      OLLAMA_EMBED_MODEL: ${EMBED_MODEL:-mxbai-embed-large}
-      CLOUD_LLM_MODEL: ${CLOUD_LLM_MODEL:-gpt-4o-mini}
-      CLOUD_LLM_BASE_URL: ${CLOUD_LLM_BASE_URL:-https://api.openai.com/v1}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-changeme}
-    depends_on:
-      db:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
-      ollama:
-        condition: service_healthy
-    ports:
-      - "${API_PORT:-8181}:8181"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8181/actuator/health"]
-      interval: 5s
-      timeout: 3s
-      retries: 30
+#  api:
+#    build:
+#      context: ./backend
+#      dockerfile: modules/app/Dockerfile
+#    container_name: gp-api
+#    environment:
+#      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+#      DB_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-greenplan}
+#      DB_USER: ${POSTGRES_USER:-gp_user}
+#      DB_PASS: ${POSTGRES_PASSWORD:-gp_pass}
+#      MINIO_ENDPOINT: http://minio:9000
+#      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+#      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+#      MINIO_BUCKET: ${MINIO_BUCKET:-greenplan}
+#      OLLAMA_BASE_URL: http://ollama:11434
+#      OLLAMA_EMBED_MODEL: ${EMBED_MODEL:-mxbai-embed-large}
+#      CLOUD_LLM_MODEL: ${CLOUD_LLM_MODEL:-gpt-4o-mini}
+#      CLOUD_LLM_BASE_URL: ${CLOUD_LLM_BASE_URL:-https://api.openai.com/v1}
+#      OPENAI_API_KEY: ${OPENAI_API_KEY:-changeme}
+#    depends_on:
+#      db:
+#        condition: service_healthy
+#      minio:
+#        condition: service_healthy
+#      ollama:
+#        condition: service_healthy
+#    ports:
+#      - "${API_PORT:-8181}:8181"
+#    healthcheck:
+#      test: ["CMD", "curl", "-f", "http://localhost:8181/actuator/health"]
+#      interval: 5s
+#      timeout: 3s
+#      retries: 30
+#    networks:
+#      - gp_net
+
+volumes:
+  db_data:
+  minio_data:
+  ollama_data:
+
+networks:
+  gp_net:
+    driver: bridge
