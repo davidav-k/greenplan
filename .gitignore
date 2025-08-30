@@ -42,4 +42,4 @@ logs/
 **/build/
 
 # Misc
-infrastructure/
+**/infrastructure/

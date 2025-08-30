@@ -1,0 +1,98 @@
+### Промпт для редактора Cursor
+
+Вот готовый промпт, который вы можете скопировать и вставить в редактор Cursor (например, в чат с AI или как инструкцию для генерации кода). Промпт составлен так, чтобы быть детальным, но гибким для итеративной разработки. Он учитывает предоставленную структуру проекта из файла "davidav-k-greenplan-8a5edab282632443 (1).txt", схему workflow из изображения "workflow_v2.jpg" (которую я интерпретировал как диаграмму с компонентами: UI → Validation → Prompting → RAG → Prompting Service → Document Repository → Local AI (Ollama) → DB (Postgres-Vector) → Object Storage (Minio) → Cloud AI, с потоками prompt/response/errors/approve/documents/zip), концепцию приложения и репозиторий https://github.com/davidav-k/greenplan.
+
+Промпт ориентирован на расширение существующего backend (Java Spring Boot с модулями), добавление frontend (предполагаю React или простую веб-форму, так как в структуре её нет), интеграцию AI (облачная для концепций, локальная Ollama для документов) и реализацию полного workflow. Он подчеркивает использование существующих модулей (app, assets, authoring, chat, generation, knowledge, project, render, shared) и добавление новых при необходимости.
+
+```
+You are an expert full-stack developer building the "greenplanner" application for AI-assisted landscape design projects. The app's workflow is:
+
+1. User fills a web interface with site characteristics (e.g., location, dimensions, sun exposure, soil type/pH/drainage, style, budget in EUR, maintenance level, notes, and optional uploads like documents/images).
+2. User submits the request.
+3. App processes: Validates input, uses cloud AI (initially OpenAI via generation module, later parallel to multiple clouds) to generate 3 visual concepts for landscaping (text descriptions + AI-generated images if possible).
+4. Response to user: Displays the 3 concepts in the UI.
+5. User selects one concept, edits/refines it (enters wishes via chat-like interface), app iterates with cloud AI until approved.
+6. User approves and sends to documentation stage.
+7. App processes: Local LLM (Ollama via authoring module) generates documents (drawings as PDFs/SVGs, estimates as XLSX, plant lists with nurseries, other printable docs) using RAG from knowledge module and storage from assets (Minio).
+8. Response: Provides downloadable ZIP with all documents.
+
+Key tech constraints:
+- Base on the existing project structure from https://github.com/davidav-k/greenplan (clone it if needed).
+- Backend: Java 21, Spring Boot 3.3.4, modules as in the provided directory (app for API/UI entry, assets for Minio storage, authoring for local LLM, chat for dialogue history, generation for cloud LLM, knowledge for RAG/PgVector, project for project management, render for doc generation, shared for contracts/events/infra).
+- Database: Postgres with pgvector for embeddings/RAG.
+- Storage: Minio for assets/docs.
+- LLMs: Cloud (OpenAI initially, via OpenAiClient in generation), Local (Ollama via OllamaClient, for docs).
+- Workflow diagram (from workflow_v2.jpg): UI → Web UI → Validation → Prompting (with template/context/RAG) → Prompting Service → Document Repository → Persist → Cloud AI. Local AI (Ollama) for docs, with DB (Postgres-Vector for embeddings/catalogs) and Minio. Flows: prompt/response/errors/approve/documents/zip.
+- Add frontend if missing: Use React.js for web interface (forms, concept display, chat for edits, document downloads). Integrate with backend API.
+- Future-proof: Design for parallel cloud AIs (e.g., add config for multiple providers).
+- Security: Basic validation, no auth yet.
+- Testing: Add basic unit tests, ensure Docker compose works (db, minio, ollama, api).
+
+Task: Implement this step-by-step. For each iteration, generate/modify code in the appropriate files/modules. Use existing code as base (e.g., ProjectController for creating projects, StorageService for uploads). Output code changes as diffs or full files. Ensure the app runs with `docker compose up` and curl tests as in README.
+
+Current iteration: [INSERT ITERATION DESCRIPTION HERE, e.g., "Implement the web form for user input in frontend and backend API endpoint."]
+```
+
+**Важно:** В промпте есть плейсхолдер `[INSERT ITERATION DESCRIPTION HERE]`. Заменяйте его на конкретную задачу для каждой итерации, чтобы Cursor фокусировался на одном аспекте. Это предотвратит генерацию всего сразу и сделает процесс управляемым.
+
+### Пошаговый план использования промпта в Cursor по итерациям
+
+Cursor (с AI от Claude/Anthropic или аналогичным) хорошо работает с итеративной разработкой: вы вставляете промпт в чат, уточняете задачу, генерируете код, применяете его (Ctrl+Enter или Apply), тестируете, затем повторяете. Не пытайтесь сгенерировать весь проект за раз — это приведёт к ошибкам, неполным реализациям и путанице. Разделите на 8-10 итераций, каждая на 1-2 часа работы. Предполагаю, что вы клонировали репозиторий https://github.com/davidav-k/greenplan в Cursor и открыли проект.
+
+1. **Подготовка (0-я итерация, 15-30 мин):**
+   - Клонируйте репозиторий в Cursor: `git clone https://github.com/davidav-k/greenplan`.
+   - Откройте проект, проверьте запуск: `docker compose up -d`, протестируйте существующий API (curl как в README).
+   - Вставьте базовый промпт в чат Cursor (Ctrl+K или новый чат). Уточните: "Analyze the current structure and confirm it matches the provided .txt file." Cursor должен вывести summary — убедитесь, что всё совпадает.
+   - Сохраните промпт как шаблон (в файле или буфере обмена).
+
+2. **Итерация 1: Расширение backend для ввода данных (1-2 часа).**
+   - В промпте замените плейсхолдер на: "Extend ProjectController and CreateProjectDto to handle full user input (location, dimensions, sunExposure, soil, style, budgetEur, maintenanceLevel, notes, file uploads). Add validation. Store input in Project entity as JSONB. Integrate with assets module for uploads to Minio."
+   - Вставьте в чат Cursor, попросите сгенерировать изменения (e.g., diffs для файлов).
+   - Apply код, commit changes (`git commit -m "Iter1: User input backend"`).
+   - Тест: Запустите app, curl POST с полными данными, проверьте DB.
+
+3. **Итерация 2: Добавление frontend для веб-формы (1-2 часа).**
+   - Плейсхолдер: "Add a React frontend in a new directory (frontend/). Create a form component for user input matching CreateProjectDto, with file upload. Integrate with backend API (/api/projects). Use Vite or CRA for setup, add to Docker compose if needed."
+   - В Cursor: Генерируйте код, apply в новые файлы.
+   - Тест: `npm run dev`, заполните форму, проверьте отправку.
+
+4. **Итерация 3: Интеграция cloud AI для генерации концепций (1-2 часа).**
+   - Плейсхолдер: "Implement concepts generation: After project creation, trigger ConceptsRequested event. In generation module, use OpenAiClient to generate 3 concepts (text + optional image prompts). Store in chat or project module. Update workflow to match diagram (Prompting → Cloud AI)."
+   - Apply, commit.
+   - Тест: Создайте проект, проверьте генерацию (логгируйте output).
+
+5. **Итерация 4: Отображение концепций в UI и выбор (1 час).**
+   - Плейсхолдер: "In frontend, add page to display 3 concepts (fetch from API). Allow user to select one. Backend: Add endpoint to get concepts, handle selection."
+   - Тест: Через UI, выберите концепцию.
+
+6. **Итерация 5: Chat для редактирования концепции (1-2 часа).**
+   - Плейсхолдер: "Use chat module for refinement: Add SSE endpoint for real-time chat with cloud AI. User enters wishes, app iterates concepts via generation. Store history in Chat/ChatEntry."
+   - Integrate with existing chat entities.
+   - Тест: Chat в UI, проверьте итерации.
+
+7. **Итерация 6: Переход к документации и local LLM (1-2 часа).**
+   - Плейсхолдер: "On approval, trigger DocumentsRequested. In authoring module, use OllamaClient to generate docs (markdown → PDF via render). Use RAG from knowledge for plant data/nurseries. Store in assets (Minio)."
+   - Add RAG search for catalogs.
+   - Тест: Approve, check doc generation.
+
+8. **Итерация 7: Генерация и скачивание документов (1 час).**
+   - Плейсхолдер: "In render module, extend SimpleRender for full docs (PDF, XLSX). Backend: Endpoint to ZIP docs and download. UI: Button for download."
+   - Тест: Download ZIP.
+
+9. **Итерация 8: RAG и знания (1 час).**
+   - Плейсхолдер: "Populate knowledge module with sample plant data (embeddings via Ollama). Integrate RAG in doc generation for accurate plant lists/nurseries."
+   - Тест: Search in RAG.
+
+10. **Итерация 9: Финализация, тесты, future-proof (1-2 часа).**
+    - Плейсхолдер: "Add unit tests for key parts. Config for multiple cloud AIs. Update README/compose.yml. Ensure full workflow works end-to-end."
+    - Тест: Полный цикл через UI.
+    - Commit, push to GitHub.
+
+**Общие советы по итерациям в Cursor:**
+- После каждой: Запускайте, тестируйте вручную/DB, фиксите баги через чат ("Fix error: [paste stacktrace]").
+- Если Cursor генерирует слишком много: Уточняйте "Only modify these files: [list]".
+- Версионирование: Commit после каждой, branch если нужно.
+- Если застряли: Добавьте в чат "Based on previous context, debug [issue]".
+- Время: 10-15 часов всего, если структура уже есть.
+
+Этот план делает разработку управляемой, минимизируя риски. Если нужно доработать промпт/план, дайте знать!
