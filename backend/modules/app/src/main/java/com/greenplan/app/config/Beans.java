@@ -1,7 +1,6 @@
-package com.greenplan.app;
+package com.greenplan.app.config;
 
 import com.greenplan.assets.StorageService;
-import com.greenplan.generation.OllamaClient;
 import com.greenplan.generation.OpenAiClient;
 import com.greenplan.render.SimpleRender;
 import org.springframework.beans.factory.annotation.Value;

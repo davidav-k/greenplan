@@ -46,30 +46,4 @@ package com.greenplan.app.api;
                 return ResponseEntity.ok(response);
             }
 
-            @ExceptionHandler(MethodArgumentNotValidException.class)
-            public ResponseEntity<Map<String, Object>> handleValidationErrors(MethodArgumentNotValidException ex) {
-                var errors = ex.getBindingResult()
-                        .getFieldErrors()
-                        .stream()
-                        .collect(Collectors.toMap(
-                                error -> error.getField(),
-                                error -> error.getDefaultMessage()
-                        ));
-
-                logger.error("Validation errors: {}", errors);
-
-                return ResponseEntity.badRequest().body(Map.of(
-                        "error", "Validation failed",
-                        "details", errors
-                ));
-            }
-
-            @ExceptionHandler(Exception.class)
-            public ResponseEntity<Map<String, Object>> handleGenericError(Exception ex) {
-                logger.error("Error creating project", ex);
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
-                        "error", "Internal server error",
-                        "message", ex.getMessage()
-                ));
-            }
         }
