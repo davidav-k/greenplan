@@ -7,9 +7,9 @@
 
     <parent>
         <groupId>com.greenplan</groupId>
-        <artifactId>backend</artifactId>
+        <artifactId>greenplan</artifactId>
         <version>0.1.0-SNAPSHOT</version>
-        <relativePath>../../pom.xml</relativePath>
+        <relativePath>../..</relativePath>
     </parent>
 
     <artifactId>render</artifactId>

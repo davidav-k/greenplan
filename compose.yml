@@ -1,5 +1,7 @@
 name: greenplan
 
+
+
 services:
   db:
     image: pgvector/pgvector:pg16
@@ -101,6 +103,27 @@ services:
       interval: 5s
       timeout: 3s
       retries: 30
+    networks:
+      - gp_net
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: gp-frontend
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+      SERVER_PORT: ${FRONTEND_PORT:-8081}
+    ports:
+      - "${FRONTEND_PORT:-8081}:8081"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - gp_net
 

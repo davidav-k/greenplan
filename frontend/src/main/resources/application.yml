@@ -1,0 +1,21 @@
+server:
+  address: 0.0.0.0
+  port: 8081
+
+spring:
+  application:
+    name: greenplan-frontend
+  
+  thymeleaf:
+    cache: false
+    prefix: classpath:/templates/
+    suffix: .html
+    encoding: UTF-8
+    mode: HTML
+    servlet:
+      content-type: text/html
+
+logging:
+  level:
+    com.greenplan.frontend: DEBUG
+    org.springframework.web: INFO
