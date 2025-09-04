@@ -3,33 +3,143 @@
 made with Grok
 ```
 Green planning application with modular architecture.
+## Stack
+- Java 21, Spring Boot 3.3.x, Maven
+- PostgreSQL (pgvector), Flyway
+- MinIO (S3-compatible storage)
+- Ollama (local LLM runtime) and optional cloud LLMs
+- Docker Compose for local infra
 
-## Project Structure
+## Repository layout
+```
+backend/
+  modules/
+    app/            # API gateway / entrypoint (aggregates domain modules)
+    assets/         # Asset storage integration (MinIO)
+    authoring/      # Local LLM authoring utilities
+    chat/           # Chat, SSE, dialogue memory
+    generation/     # Text generation utilities
+    knowledge/      # RAG: docs, chunks, embeddings (pgvector)
+    project/        # Project management (projects, tasks, states)
+    render/         # HTML→PDF, XLSX, SVG→PNG
+    shared/
+      contracts/    # Shared DTOs/contracts
+      infra/        # Infra utilities shared by modules
+frontend/           # Spring Boot + Thymeleaf SSR
+infrastructure/
+  db/               # Postgres data and init
+  minio/            # MinIO data
+  ollama/           # Ollama state (models, keys)
+compose.yml         # Local stack and app services
+pom.xml             # Parent POM (dependency management)
+```
 
-### Modules
-- **app**: Web/API layer (entrypoint) - REST controllers and application configuration
-- **contracts**: Shared DTOs and contracts between modules
-- **assets**: Asset management - images, files, etc (MinIO)
-- **authoring**: Local LLM (typography documents, etc)
-- **chat**: Chat module - chat with the user, dialogue history (persisted memory), SSE
-- **generation**: LLM generation module (text generation, etc)
-- **knowledge**: RAG - documents, chunks, embeddings, search (Postgres + pgvector)
-- **projects**: Project management (projects, tasks, etc) projects/parameters/workflow statuses
-- **render**: HTML → PDF, XLSX, SVG → PNG
+Notes:
+- The domain module is named `project` (singular) in code.
+- The `app` module depends on all other backend modules; root `pom.xml` provides dependency management.
 
-### Planned Modules
-- **catalog**: Plants/catalogs/prices, reference books
+## Services and default ports
+- API (`backend/modules/app`): `8181` (health: `/actuator/health`)
+- Frontend (`frontend`): `8081`
+- PostgreSQL: host `${DB_PORT:-5532}` → container `5432`
+- MinIO: API `${MINIO_PORT:-9000}`, Console `${MINIO_CONSOLE_PORT:-9001}`
+- Ollama: `${OLLAMA_PORT:-11434}`
 
-## Technology Stack
-- Java
-- Spring Boot
-- Maven
-- PostgreSQL
-- MinIO
-- Ollama (LLM)
+## Quick start (Docker Compose)
+Prereqs: Docker Desktop 4+, Java 21 (for local builds if not using prebuilt images).
 
-## Launch
-
-1. Start infrastructure services:
+1) Start infra and apps:
 ```bash
-docker compose -f docker/compose.yml up -d db minio ollama
+docker compose up -d
+```
+
+2) Open:
+- Frontend: http://localhost:8081/
+- API health: http://localhost:8181/actuator/health
+- MinIO Console: http://localhost:9001/ (default: minioadmin / minioadmin)
+
+To stop:
+```bash
+docker compose down
+```
+
+## Environment configuration
+Override via environment or a `.env` file at repo root.
+
+Infrastructure:
+- `POSTGRES_DB` (default `greenplan`)
+- `POSTGRES_USER` (default `gp_user`)
+- `POSTGRES_PASSWORD` (default `gp_pass`)
+- `DB_PORT` (host port, default `5532`)
+- `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD` (default `minioadmin` / `minioadmin`)
+- `MINIO_PORT` (default `9000`), `MINIO_CONSOLE_PORT` (default `9001`)
+- `OLLAMA_PORT` (default `11434`)
+
+API (`app`):
+- `SPRING_PROFILES_ACTIVE` (default `dev`)
+- `DB_URL` (default `jdbc:postgresql://db:5432/${POSTGRES_DB}` in containers; `jdbc:postgresql://localhost:5532/greenplan` locally)
+- `DB_USER`, `DB_PASS`
+- `MINIO_ENDPOINT` (default `http://minio:9000` in containers; `http://localhost:9000` locally)
+- `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`, `MINIO_BUCKET` (default `greenplan`)
+- `OLLAMA_BASE_URL` (default `http://ollama:11434` in containers; `http://localhost:11434` locally)
+- `OLLAMA_EMBED_MODEL` (default `mxbai-embed-large`)
+- `CLOUD_LLM_BASE_URL` (default `https://api.openai.com/v1`)
+- `CLOUD_LLM_MODEL` (default `gpt-4o-mini`)
+- `OPENAI_API_KEY` (default `changeme` – set a real key to enable cloud LLMs)
+
+Frontend:
+- `SPRING_PROFILES_ACTIVE` (default `dev`)
+- `FRONTEND_PORT` (default `8081`)
+
+## Local development (without Docker)
+Start infra with Compose, then run apps from your IDE/CLI.
+
+1) Infra only:
+```bash
+docker compose up -d db minio ollama
+```
+
+2) API (from project root):
+```bash
+mvn -f backend/modules/app spring-boot:run
+```
+
+3) Frontend (from project root):
+```bash
+mvn -f frontend spring-boot:run
+```
+
+Build jars:
+```bash
+mvn -f backend/modules/app clean package
+mvn -f frontend clean package
+```
+
+## Data directories
+- PostgreSQL data: `infrastructure/db/data`
+- PostgreSQL init scripts: `infrastructure/db/init`
+- MinIO data: `infrastructure/minio/data`
+- Ollama data/models: `infrastructure/ollama`
+
+## Modules overview
+- `app`: Spring Boot API, aggregates domain modules, exposes REST, configures Flyway and datasource.
+- `shared/contracts`: shared DTOs and contracts.
+- `shared/infra`: shared infra helpers.
+- `assets`: MinIO integration for object storage.
+- `authoring`: local LLM utilities for document/typography authoring.
+- `chat`: chat/SSE and persisted dialogue memory.
+- `generation`: LLM text generation utilities.
+- `knowledge`: RAG—documents, chunking, embeddings, search on pgvector.
+- `project`: project/task/workflow management.
+- `render`: document rendering (HTML→PDF, XLSX, SVG→PNG).
+
+## Health checks
+- API: `/actuator/health`
+- Frontend: root `/` responds 200 when healthy (Compose healthcheck)
+- MinIO: `/minio/health/live`
+- PostgreSQL: `pg_isready`
+- Ollama: `/api/tags`
+
+## Licensing
+Proprietary or TBD. Add a license file if you plan to open-source.
+
