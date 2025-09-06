@@ -1,0 +1,1 @@
+User input: {input}. Output in strict JSON format without any additional text.

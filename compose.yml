@@ -1,7 +1,4 @@
 name: greenplan
-
-
-
 services:
   db:
     image: pgvector/pgvector:pg16
@@ -23,7 +20,6 @@ services:
     networks:
       - gp_net
 
-
   minio:
     image: minio/minio:RELEASE.2025-07-23T15-54-02Z-cpuv1
     container_name: gp-minio
@@ -38,9 +34,9 @@ services:
       - ./infrastructure/minio/data:/data
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 5s
-      timeout: 3s
-      retries: 30
+      interval: 10s
+      timeout: 5s
+      retries: 10
     networks:
       - gp_net
 
@@ -55,10 +51,10 @@ services:
     volumes:
       - ./infrastructure/ollama:/root/.ollama
     healthcheck:
-      test: ["CMD", "curl", "-s", "http://localhost:11434/api/tags"]
-      interval: 5s
-      timeout: 3s
-      retries: 30
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
     networks:
       - gp_net
 #    entrypoint: >
@@ -72,8 +68,8 @@ services:
 
   api:
     build:
-      context: ./backend
-      dockerfile: modules/app/Dockerfile
+      context: .
+      dockerfile: backend/modules/app/Dockerfile
     container_name: gp-api
     environment:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
@@ -99,33 +95,39 @@ services:
     ports:
       - "${API_PORT:-8181}:8181"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8181/actuator/health"]
-      interval: 5s
-      timeout: 3s
-      retries: 30
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8181/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
     networks:
       - gp_net
 
   frontend:
-    build:
-      context: .
-      dockerfile: frontend/Dockerfile
-    container_name: gp-frontend
-    environment:
-      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
-      SERVER_PORT: ${FRONTEND_PORT:-8081}
-    ports:
-      - "${FRONTEND_PORT:-8081}:8081"
-    depends_on:
-      api:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8081/"]
+   build:
+     context: .
+     dockerfile: frontend/Dockerfile
+   container_name: gp-frontend
+   environment:
+     SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+     SERVER_PORT: ${FRONTEND_PORT:-8081}
+   ports:
+     - "${FRONTEND_PORT:-8081}:8081"
+   depends_on:
+     db:
+       condition: service_healthy
+     minio:
+       condition: service_healthy
+     ollama:
+       condition: service_healthy
+     api:
+       condition: service_healthy
+   healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8081/"]
       interval: 10s
       timeout: 5s
-      retries: 5
-    networks:
-      - gp_net
+      retries: 10
+   networks:
+     - gp_net
 
 volumes:
   db_data:

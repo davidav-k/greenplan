@@ -1,8 +1,7 @@
-# greenplan
-```markdown
-made with Grok
-```
-Green planning application with modular architecture.
+## Greenplan
+
+Greenplan is a modular Java/Spring Boot monorepo for “green planning”: projects, knowledge/RAG, LLM-based generation/authoring, asset storage, and document rendering. It ships with local infrastructure (PostgreSQL + pgvector, MinIO, Ollama) and a minimal SSR frontend.
+
 ## Stack
 - Java 21, Spring Boot 3.3.x, Maven
 - PostgreSQL (pgvector), Flyway
@@ -35,7 +34,6 @@ pom.xml             # Parent POM (dependency management)
 ```
 
 Notes:
-- The domain module is named `project` (singular) in code.
 - The `app` module depends on all other backend modules; root `pom.xml` provides dependency management.
 
 ## Services and default ports
@@ -48,12 +46,17 @@ Notes:
 ## Quick start (Docker Compose)
 Prereqs: Docker Desktop 4+, Java 21 (for local builds if not using prebuilt images).
 
-1) Start infra and apps:
+1) Build frontend JAR (required before first run):
+```bash
+mvn clean package -pl frontend -DskipTests
+```
+
+2) Start infra and apps:
 ```bash
 docker compose up -d
 ```
 
-2) Open:
+3) Open:
 - Frontend: http://localhost:8081/
 - API health: http://localhost:8181/actuator/health
 - MinIO Console: http://localhost:9001/ (default: minioadmin / minioadmin)
@@ -134,12 +137,23 @@ mvn -f frontend clean package
 - `render`: document rendering (HTML→PDF, XLSX, SVG→PNG).
 
 ## Health checks
-- API: `/actuator/health`
-- Frontend: root `/` responds 200 when healthy (Compose healthcheck)
-- MinIO: `/minio/health/live`
-- PostgreSQL: `pg_isready`
-- Ollama: `/api/tags`
+All services use unified health check configuration:
+- **interval**: 10s
+- **timeout**: 5s  
+- **retries**: 10 (PostgreSQL: 30 for stability)
 
-## Licensing
-Proprietary or TBD. Add a license file if you plan to open-source.
+Service-specific checks:
+- **API**: `wget` → `/actuator/health`
+- **Frontend**: `wget` → `/` (root endpoint)
+- **MinIO**: `curl` → `/minio/health/live`
+- **PostgreSQL**: `pg_isready` command
+- **Ollama**: `ollama list` command
 
+## Startup order
+Services start in dependency order:
+1. **Infrastructure**: `db`, `minio`, `ollama` (parallel)
+2. **API**: `gp-api` (waits for all infrastructure)
+3. **Frontend**: `gp-frontend` (waits for all services including API)
+
+
+ 

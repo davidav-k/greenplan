@@ -2,10 +2,19 @@
 <project version="4">
   <component name="CompilerConfiguration">
     <annotationProcessing>
+      <profile default="true" name="Default" enabled="true" />
       <profile name="Maven default annotation processors profile" enabled="true">
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
+      </profile>
+      <profile name="Annotation profile for greenplan" enabled="true">
+        <sourceOutputDir name="target/generated-sources/annotations" />
+        <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
+        <outputRelativeToContentRoot value="true" />
+        <processorPath useClasspath="false">
+          <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.32/lombok-1.18.32.jar" />
+        </processorPath>
         <module name="app" />
         <module name="generation" />
         <module name="assets" />
@@ -15,9 +24,13 @@
         <module name="infra" />
         <module name="contracts" />
         <module name="render" />
+        <module name="frontend" />
         <module name="knowledge" />
       </profile>
     </annotationProcessing>
+    <bytecodeTargetLevel>
+      <module name="backend" target="1.5" />
+    </bytecodeTargetLevel>
   </component>
   <component name="JavacSettings">
     <option name="ADDITIONAL_OPTIONS_OVERRIDE">
@@ -26,7 +39,9 @@
       <module name="authoring" options="-parameters" />
       <module name="chat" options="-parameters" />
       <module name="contracts" options="-parameters" />
+      <module name="frontend" options="-parameters" />
       <module name="generation" options="-parameters" />
+      <module name="greenplan" options="-parameters" />
       <module name="infra" options="-parameters" />
       <module name="knowledge" options="-parameters" />
       <module name="project" options="-parameters" />
